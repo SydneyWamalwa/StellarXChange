@@ -1,5 +1,7 @@
 import StellarSdk from 'stellar-sdk';
 import { config } from '../config/networks.js';
+import fetch from 'node-fetch';
+globalThis.fetch = fetch; // Polyfill for Node.js
 
 export async function createMultisigAccount(signers, thresholds) {
   const server = new StellarSdk.Server(config.horizonUrl);
@@ -14,7 +16,7 @@ export async function createMultisigAccount(signers, thresholds) {
     fee: StellarSdk.BASE_FEE
   })
     .addOperation(StellarSdk.Operation.setOptions({
-      masterWeight: 0, // Disable master key
+      masterWeight: 0,
       signer: signers.map(s => ({
         ed25519PublicKey: s.publicKey,
         weight: s.weight
