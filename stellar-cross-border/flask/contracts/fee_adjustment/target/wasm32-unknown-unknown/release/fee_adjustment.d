@@ -1,0 +1,1 @@
+/home/sydney/StellarXChange/stellar-cross-border/flask/contracts/fee_adjustment/target/wasm32-unknown-unknown/release/fee_adjustment.wasm: /home/sydney/StellarXChange/stellar-cross-border/flask/contracts/fee_adjustment/src/lib.rs

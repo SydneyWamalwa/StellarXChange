@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Initiate Escrow Transaction</h2>
+  <form method="post">
+    <div class="form-group">
+      <label for="user_a_secret">Your (User A) Secret Key:</label>
+      <input type="text" class="form-control" id="user_a_secret" name="user_a_secret" required>
+    </div>
+    <div class="form-group">
+      <label for="user_b_public">Counterparty (User B) Public Key:</label>
+      <input type="text" class="form-control" id="user_b_public" name="user_b_public" required>
+    </div>
+    <div class="form-group">
+      <label for="mediator_public">Mediator/Public Arbiter Public Key:</label>
+      <input type="text" class="form-control" id="mediator_public" name="mediator_public" required>
+    </div>
+    <div class="form-group">
+      <label for="amount">Amount to Escrow (XLM):</label>
+      <input type="number" step="any" class="form-control" id="amount" name="amount" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Initiate Escrow</button>
+  </form>
+{% endblock %}

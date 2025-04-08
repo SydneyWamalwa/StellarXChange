@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Escrow Initiated</h2>
+  <p>Your escrow account has been set up successfully.</p>
+  <p><strong>Escrow Account Public Key:</strong> {{ escrow_pub }}</p>
+  <p><strong>Escrow Account Secret Key:</strong> {{ escrow_secret }}</p>
+  <p>Funds have been transferred to the escrow account. The multisig configuration requires approval by both the counterparty and a mediator to release funds.</p>
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">Return Home</a>
+{% endblock %}

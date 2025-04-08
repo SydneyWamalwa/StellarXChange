@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Account Created</h2>
+  <p>Your new Stellar account has been created and funded on the testnet.</p>
+  <p><strong>Public Key:</strong> {{ public_key }}</p>
+  <p><strong>Secret Key:</strong> {{ secret }}</p>
+  <p>Please store your secret key securely.</p>
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">Return Home</a>
+{% endblock %}

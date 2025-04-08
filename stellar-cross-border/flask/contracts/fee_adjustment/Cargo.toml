@@ -1,0 +1,16 @@
+[package]
+name = "fee_adjustment"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"] # Required for Wasm build
+path = "src/lib.rs"
+
+[dependencies]
+soroban-sdk = "22.0.7"
+
+
+[profile.release]
+lto = true
+opt-level = "z"
