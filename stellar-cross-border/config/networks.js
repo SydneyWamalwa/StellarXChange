@@ -1,3 +1,4 @@
+// config/networks.js
 export const config = {
   testnet: {
     horizonUrl: "https://horizon-testnet.stellar.org",
@@ -9,3 +10,4 @@ export const config = {
     networkPassphrase: "Public Global Stellar Network ; September 2015"
   }
 };
+

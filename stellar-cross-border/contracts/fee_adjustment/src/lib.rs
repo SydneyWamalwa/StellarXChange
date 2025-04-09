@@ -1,16 +1,14 @@
 #![no_std]
-use soroban_sdk::{contractimpl, Env, Symbol, Vec};
 
+use soroban_sdk::{contract, contractimpl, Env};
+
+#[contract]
 pub struct FeeAdjustmentContract;
 
 #[contractimpl]
 impl FeeAdjustmentContract {
-    pub fn calculate_fee(env: Env, tx_count: u32) -> u32 {
-        let base_fee = 100; // 0.00001 XLM
-        if tx_count > 1000 {
-            base_fee * 2
-        } else {
-            base_fee
-        }
+    pub fn calculate_fee(_env: Env, tx_count: u32) -> u32 {
+        // Simple fee calculation logic
+        100 * tx_count
     }
 }
