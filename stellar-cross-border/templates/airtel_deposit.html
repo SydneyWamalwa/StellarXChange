@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Airtel Money Deposit</h2>
+<p>Current rate: 1 XLM = {{ rate|round(2) }} INR</p>
+<form method="POST">
+    <input type="number" step="0.01" name="amount" placeholder="INR Amount" required>
+    <button type="submit">Deposit</button>
+</form>
+{% endblock %}

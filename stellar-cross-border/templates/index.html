@@ -4,6 +4,15 @@
   {% if user_keys %}
     <p><strong>Your Stellar Public Key:</strong> {{ user_keys.public_key }}</p>
     <p><strong>Your Stellar Secret Key:</strong> {{ user_keys.secret_key }}</p>
+    <div class="balance-section">
+      <h3>Your Balance</h3>
+      <p>{{ user_keys.balance|round(2) }} XLM</p>
+      <p>≈ {{ (user_keys.balance * user_keys.xlm_rate)|round(2) }} {{ user_keys.local_currency }}</p>
+      <div class="deposit-options">
+          <a href="{{ url_for('mpesa_deposit') }}" class="btn">Deposit via M-Pesa</a>
+          <a href="{{ url_for('airtel_deposit') }}" class="btn">Deposit via Airtel</a>
+      </div>
+  </div>
   {% else %}
     <p>Select an option from the navigation bar above.</p>
   {% endif %}
