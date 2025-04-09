@@ -1,9 +1,9 @@
+<!-- base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>StellarPay Prototype</title>
-  <!-- You can include Bootstrap for easy styling -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
@@ -11,13 +11,21 @@
     <a class="navbar-brand" href="{{ url_for('index') }}">StellarPay</a>
     <div class="collapse navbar-collapse">
       <ul class="navbar-nav mr-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('create_account') }}">Create Account</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('send_payment') }}">Send Payment</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('initiate_escrow') }}">Initiate Escrow</a></li>
+        {% if session.get('user_id') %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('send_payment') }}">Send Payment</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('initiate_escrow') }}">Initiate Escrow</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('escrow_approvals') }}">Escrow Approvals</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('create_account') }}">Sign Up</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+        {% endif %}
       </ul>
     </div>
   </nav>
-  
+
   <div class="container mt-4">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -31,9 +39,8 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
-    
-    {% block content %}
-    {% endblock %}
+
+    {% block content %}{% endblock %}
   </div>
 
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>

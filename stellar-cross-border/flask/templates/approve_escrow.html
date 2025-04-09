@@ -1,0 +1,30 @@
+<!-- templates/approve_escrow.html -->
+{% extends "base.html" %}
+{% block content %}
+  <h2>Approve Escrow Transaction</h2>
+  <p><strong>Escrow Account Public Key:</strong> {{ escrow.escrow_public_key }}</p>
+  <p><strong>Amount (XLM):</strong> {{ escrow.amount }}</p>
+  <p><strong>Status:</strong> {{ escrow.status }}</p>
+  <p><strong>Approvals:</strong> {{ escrow.approvals }}</p>
+  <p><strong>Deadline:</strong> {{ escrow.deadline }}</p>
+  <p id="timer"></p>
+  <form method="post">
+      <button type="submit" class="btn btn-primary">Approve Escrow</button>
+  </form>
+  <script>
+    // JavaScript Countdown Timer
+    var remainingSeconds = { remaining_seconds };
+    function updateTimer() {
+        var minutes = Math.floor(remainingSeconds / 60);
+        var seconds = remainingSeconds % 60;
+        document.getElementById("timer").innerText = "Time remaining: " + minutes + "m " + seconds + "s";
+        if(remainingSeconds > 0) {
+            remainingSeconds--;
+            setTimeout(updateTimer, 1000);
+        } else {
+            document.getElementById("timer").innerText = "Deadline reached.";
+        }
+    }
+    updateTimer();
+  </script>
+{% endblock %}

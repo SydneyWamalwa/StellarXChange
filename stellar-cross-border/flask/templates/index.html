@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>Welcome to StellarPay Prototype</h1>
-  <p>Select an option from the navigation bar above.</p>
+  {% if user_keys %}
+    <p><strong>Your Stellar Public Key:</strong> {{ user_keys.public_key }}</p>
+    <p><strong>Your Stellar Secret Key:</strong> {{ user_keys.secret_key }}</p>
+  {% else %}
+    <p>Select an option from the navigation bar above.</p>
+  {% endif %}
 {% endblock %}

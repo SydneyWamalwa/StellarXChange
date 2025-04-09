@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import stellar_sdk
 from stellar_sdk import (
     Keypair,
@@ -8,54 +8,171 @@ from stellar_sdk import (
     Network,
     Asset,
     Payment,
-    Signer,  # <-- Explicit import for Payment operation
-    SetOptions,  # <-- For set_options operations
-    CreateAccount  # <-- If you need account creation
+    Signer,
+    SetOptions
 )
 import requests
 import os
-from stellar_sdk import Signer  # Add this import
-
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import or_
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+from flask_migrate import Migrate
 
-# Use testnet configuration
+# Configure SQLite
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stellarpay.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# Stellar configuration for testnet
 HORIZON_URL = "https://horizon-testnet.stellar.org"
 NETWORK_PASSPHRASE = Network.TESTNET_NETWORK_PASSPHRASE
 FRIENDBOT_URL = "https://friendbot.stellar.org"
-
 server = Server(horizon_url=HORIZON_URL)
 
-# Utility function to fund account using Friendbot
+##########################################################
+# Database Models
+##########################################################
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    stellar_public_key = db.Column(db.String(56), nullable=False)
+    stellar_secret_key = db.Column(db.String(56), nullable=False)  # Note: Encrypt in production
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class Escrow(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, nullable=False)
+    receiver_public_key = db.Column(db.String(56), nullable=False)
+    mediator_public_key = db.Column(db.String(56), nullable=True)
+    escrow_public_key = db.Column(db.String(56), nullable=False)
+    escrow_secret_key = db.Column(db.String(56), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, released, locked
+    deadline = db.Column(db.DateTime, nullable=False)
+    approvals = db.Column(db.Integer, default=0)  # New field for tracking approvals
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def is_expired(self):
+        return datetime.utcnow() > self.deadline
+
+##########################################################
+# Utility Functions
+##########################################################
+
 def fund_account(public_key):
     response = requests.get(f"{FRIENDBOT_URL}?addr={public_key}")
     return response.json()
 
-@app.route('/')
-def index():
-    # Home page allows users to create account, perform payment, or initiate escrow
-    return render_template('index.html')
+def get_base_fee():
+    return server.fetch_base_fee()
+
+##########################################################
+# Authentication Endpoints
+##########################################################
 
 @app.route('/create-account', methods=['GET', 'POST'])
 def create_account():
     if request.method == "POST":
-        # Generate a new Stellar keypair
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        # Check if user already exists
+        if User.query.filter((User.username == username) | (User.email == email)).first():
+            flash("User already exists", "danger")
+            return redirect(url_for('create_account'))
+
         kp = Keypair.random()
         public_key = kp.public_key
         secret = kp.secret
 
-        # Fund account using Friendbot
         try:
-            fund_data = fund_account(public_key)
+            fund_account(public_key)
             flash("Account created and funded successfully!", "success")
         except Exception as e:
             flash(f"Error funding account: {str(e)}", "danger")
+            return redirect(url_for('create_account'))
 
-        return render_template("account_created.html", public_key=public_key, secret=secret)
-    return render_template('create_account.html')
+        user = User(
+            username=username,
+            email=email,
+            stellar_public_key=public_key,
+            stellar_secret_key=secret
+        )
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        # Auto-login the user after signup
+        session['user_id'] = user.id
+        return redirect(url_for('index'))
+    return render_template('signup.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == "POST":
+        email = request.form.get('email')
+        password = request.form.get('password')
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            flash("Login successful", "success")
+            return redirect(url_for('index'))
+        else:
+            flash("Invalid credentials", "danger")
+            return redirect(url_for('login'))
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash("Logged out successfully", "success")
+    return redirect(url_for('login'))
+
+##########################################################
+# Profile Page (Accessible via Nav Bar)
+##########################################################
+
+@app.route('/profile', methods=['GET'])
+def profile():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Please log in first", "warning")
+        return redirect(url_for('login'))
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for('login'))
+    # By default, hide secret key
+    show_keys = request.args.get('show_keys', 'false').lower() == 'true'
+    user_data = {
+        "username": user.username,
+        "email": user.email,
+        "stellar_public_key": user.stellar_public_key,
+        "stellar_secret_key": user.stellar_secret_key if show_keys else "**** (hidden)"
+    }
+    return render_template("profile.html", user=user_data)
+
+##########################################################
+# Payment Endpoint (As Before)
+##########################################################
 
 @app.route('/send-payment', methods=['GET', 'POST'])
 def send_payment():
+    if not session.get('user_id'):
+        flash("Please log in to send payments", "warning")
+        return redirect(url_for('login'))
+
     if request.method == "POST":
         source_secret = request.form.get('source_secret')
         dest = request.form.get('destination')
@@ -63,16 +180,13 @@ def send_payment():
         try:
             source_kp = Keypair.from_secret(source_secret)
             source_pub = source_kp.public_key
-            base_fee = server.fetch_base_fee()
+            base_fee = get_base_fee()
 
-            # Load account
             source_account = server.load_account(account_id=source_pub)
-
-            # Create payment transaction
             tx = TransactionBuilder(
                     source_account=source_account,
                     network_passphrase=NETWORK_PASSPHRASE,
-                    base_fee=server.fetch_base_fee()
+                    base_fee=base_fee
                 ) \
                 .append_operation(
                     Payment(
@@ -91,66 +205,67 @@ def send_payment():
             flash(f"Payment failed: {e}", "danger")
     return render_template('send_payment.html')
 
+##########################################################
+# Escrow Endpoint (Simplified Version)
+##########################################################
+
 @app.route('/initiate-escrow', methods=['GET', 'POST'])
 def initiate_escrow():
-    """
-    For multisig escrow:
-    - Creates escrow account with 2/3 multisig requiring 2 signatures (userA, userB, mediator)
-    """
+    if not session.get('user_id'):
+        flash("Please log in first", "warning")
+        return redirect(url_for('login'))
+
     if request.method == "POST":
         user_a_secret = request.form.get('user_a_secret')
         user_b_public = request.form.get('user_b_public')
         mediator_public = request.form.get('mediator_public')
         amount = request.form.get('amount')
-
         try:
-            # Validate and setup accounts
             user_a_kp = Keypair.from_secret(user_a_secret)
             user_a_pub = user_a_kp.public_key
 
             # Create and fund escrow account
             escrow_kp = Keypair.random()
             escrow_pub = escrow_kp.public_key
-            fund_account(escrow_pub)  # Fund with Friendbot
+            escrow_secret = escrow_kp.secret
+            fund_account(escrow_pub)
             escrow_account = server.load_account(escrow_pub)
 
-            # Create signer objects
             signer_a = Signer.ed25519_public_key(user_a_pub, weight=1)
             signer_b = Signer.ed25519_public_key(user_b_public, weight=1)
             signer_mediator = Signer.ed25519_public_key(mediator_public, weight=1)
+            base_fee = get_base_fee()
 
-            # Single transaction with correct parameters
             tx = TransactionBuilder(
                 source_account=escrow_account,
                 network_passphrase=NETWORK_PASSPHRASE,
-                base_fee=server.fetch_base_fee()
+                base_fee=base_fee
             ).append_operation(
                 SetOptions(
                     master_weight=0,
                     low_threshold=2,
                     med_threshold=2,
                     high_threshold=2,
-                    signer=signer_a  # Set first signer
+                    signer=signer_a
                 )
             ).append_operation(
                 SetOptions(
-                    signer=signer_b  # Add second signer
+                    signer=signer_b
                 )
             ).append_operation(
                 SetOptions(
-                    signer=signer_mediator  # Add third signer
+                    signer=signer_mediator
                 )
             ).set_timeout(30).build()
 
             tx.sign(escrow_kp)
             server.submit_transaction(tx)
 
-            # Transfer funds to escrow
             user_a_account = server.load_account(user_a_pub)
             payment_tx = TransactionBuilder(
                 source_account=user_a_account,
                 network_passphrase=NETWORK_PASSPHRASE,
-                base_fee=server.fetch_base_fee()
+                base_fee=get_base_fee()
             ).append_operation(
                 Payment(
                     destination=escrow_pub,
@@ -162,15 +277,111 @@ def initiate_escrow():
             payment_tx.sign(user_a_kp)
             server.submit_transaction(payment_tx)
 
-            flash(f'Escrow created! Account: {escrow_pub}', "success")
-            return render_template("escrow_created.html",
-                                escrow_pub=escrow_pub,
-                                escrow_secret=escrow_kp.secret)
-
+            deadline = (datetime.utcnow() + timedelta(minutes=60)).isoformat()
+            new_escrow = Escrow(
+                sender_id=session.get('user_id'),
+                receiver_public_key=user_b_public,
+                mediator_public_key=mediator_public,
+                escrow_public_key=escrow_pub,
+                escrow_secret_key=escrow_secret,
+                amount=amount,
+                status='pending',
+                deadline=datetime.fromisoformat(deadline),
+                approvals=0
+            )
+            db.session.add(new_escrow)
+            db.session.commit()
+            flash(f'Escrow created! Account: {escrow_pub}. Deadline for approvals: {deadline}', "success")
+            return render_template("escrow_created.html", escrow_pub=escrow_pub, escrow_secret=escrow_secret, deadline=deadline)
         except Exception as e:
             flash(f"Escrow failed: {str(e)}", "danger")
-
     return render_template('initiate_escrow.html')
+
+@app.route('/approve-escrow/<int:escrow_id>', methods=['GET', 'POST'])
+def approve_escrow(escrow_id):
+    # Lookup the escrow record from the database
+    escrow = Escrow.query.get(escrow_id)
+    if not escrow:
+        flash("Escrow not found", "danger")
+        return redirect(url_for('index'))
+
+    # If escrow is pending but deadline is reached, update status
+    if escrow.is_expired() and escrow.status == 'pending':
+        escrow.status = 'locked'
+        db.session.commit()
+        flash("Escrow deadline reached. Escrow is now locked.", "danger")
+        return redirect(url_for('index'))
+
+    if request.method == "POST":
+        # Register an approval (you might later associate which party approved)
+        escrow.approvals += 1
+
+        # For demonstration, require 2 approvals to mark as approved
+        if escrow.approvals >= 2:
+            escrow.status = 'approved'
+            flash("Escrow approved! Funds can now be disbursed.", "success")
+        else:
+            flash("Your approval has been recorded. Waiting for additional approvals.", "info")
+        db.session.commit()
+        return redirect(url_for('approve_escrow', escrow_id=escrow_id))
+
+    # Calculate remaining time in seconds for a real-time countdown
+    remaining_seconds = int((escrow.deadline - datetime.utcnow()).total_seconds())
+    if remaining_seconds < 0:
+        remaining_seconds = 0
+
+    return render_template('approve_escrow.html', escrow=escrow, remaining_seconds=remaining_seconds)
+
+
+@app.route('/escrow-approvals', methods=['GET'])
+def escrow_approvals():
+    # Ensure the user is logged in before accessing escrow approvals
+    if not session.get('user_id'):
+        flash("Please log in to view escrow approvals", "warning")
+        return redirect(url_for('login'))
+
+    # Retrieve current user from the database
+    user = User.query.get(session.get('user_id'))
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for('login'))
+
+    # Query escrow records that are pending and involve the current user in some capacity.
+    pending_escrows = Escrow.query.filter(
+        Escrow.status == 'pending',
+        or_(
+            Escrow.sender_id == user.id,
+            Escrow.receiver_public_key == user.stellar_public_key,
+            Escrow.mediator_public_key == user.stellar_public_key
+        )
+    ).all()
+
+    return render_template('escrow_approvals.html', escrows=pending_escrows)
+
+
+
+##########################################################
+# DB Initialization and Home Route
+##########################################################
+
+@app.before_request
+def create_tables():
+    with app.app_context():
+        db.create_all()
+
+
+@app.route('/')
+def index():
+    user_id = session.get('user_id')
+    if user_id:
+        user = User.query.get(user_id)
+        user_keys = {
+            'public_key': user.stellar_public_key,
+            'secret_key': user.stellar_secret_key  # Show keys on index as per requirement
+        }
+        return render_template('index.html', user_keys=user_keys)
+    else:
+        return redirect(url_for('login'))
+
 if __name__ == '__main__':
     app.run(debug=True)
-

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>User Profile</h2>
+  <p><strong>Username:</strong> {{ user.username }}</p>
+  <p><strong>Email:</strong> {{ user.email }}</p>
+  <p><strong>Stellar Public Key:</strong> {{ user.stellar_public_key }}</p>
+  <p><strong>Stellar Secret Key:</strong> {{ user.stellar_secret_key }}</p>
+  <a href="{{ url_for('profile', show_keys='false') }}" class="btn btn-secondary">Hide Secret Key</a>
+  <a href="{{ url_for('profile', show_keys='true') }}" class="btn btn-secondary">Show Secret Key</a>
+{% endblock %}

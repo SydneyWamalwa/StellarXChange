@@ -1,0 +1,39 @@
+<!-- templates/escrow_approvals.html -->
+{% extends "base.html" %}
+{% block content %}
+  <h2>Escrow Transactions Needing Approval</h2>
+  {% if escrows and escrows|length > 0 %}
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Escrow ID</th>
+          <th>Sender ID</th>
+          <th>Receiver Public Key</th>
+          <th>Amount (XLM)</th>
+          <th>Status</th>
+          <th>Deadline</th>
+          <th>Approvals</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for escrow in escrows %}
+        <tr>
+          <td>{{ escrow.id }}</td>
+          <td>{{ escrow.sender_id }}</td>
+          <td>{{ escrow.receiver_public_key }}</td>
+          <td>{{ escrow.amount }}</td>
+          <td>{{ escrow.status }}</td>
+          <td>{{ escrow.deadline }}</td>
+          <td>{{ escrow.approvals }}</td>
+          <td>
+            <a class="btn btn-primary btn-sm" href="{{ url_for('approve_escrow', escrow_id=escrow.id) }}">Approve</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No escrow transactions require approval at this time.</p>
+  {% endif %}
+{% endblock %}
