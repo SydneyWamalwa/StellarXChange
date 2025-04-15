@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="escrow-status">
+    <h2>Escrow #{{ escrow.id }}</h2>
+    <p>Amount: {{ escrow.amount }} XLM</p>
+    <p>Status: <span class="status-{{ escrow.status }}">{{ escrow.status|upper }}</span></p>
+
+    {% if escrow.status == 'pending' %}
+        <div class="approval-section">
+            {% if can_approve %}
+            <form method="POST" action="{{ url_for('approve_escrow', escrow_id=escrow.id) }}">
+                <button type="submit" class="btn-approve">
+                    Approve as {{ role|title }}
+                </button>
+            </form>
+            {% endif %}
+
+            {% if remaining_time %}
+            <div class="timer">
+                <p>Time remaining: {{ remaining_time // 3600 }}h {{ (remaining_time % 3600) // 60 }}m</p>
+                <div class="time-bar">
+                    <div class="time-progress" style="width: {{ (remaining_time / 43200) * 100 }}%"></div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="participants">
+        <div class="party sender">
+            <h4>Sender</h4>
+            <p>{{ escrow.sender_public_key|truncate(20) }}</p>
+            <span class="approval-status {{ 'approved' if escrow.sender_approved else 'pending' }}">
+                {{ 'Approved' if escrow.sender_approved else 'Pending' }}
+            </span>
+        </div>
+
+        <div class="party receiver">
+            <h4>Receiver</h4>
+            <p>{{ escrow.receiver_public_key|truncate(20) }}</p>
+            <span class="approval-status {{ 'approved' if escrow.receiver_approved else 'pending' }}">
+                {{ 'Approved' if escrow.receiver_approved else 'Pending' }}
+            </span>
+        </div>
+    </div>
+</div>
+{% endblock %}
